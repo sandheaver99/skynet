@@ -112,8 +112,8 @@ class Player
 				skynet.getLinks().remove(l);
 			}
 					
-            // Write an action using System.out.println()
-            // To debug: System.err.println("Debug messages...");
+            
+            
 
             System.out.println(actionString); // Example: 0 1 are the indices of the nodes you wish to sever the link between
 			
