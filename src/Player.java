@@ -74,11 +74,15 @@ class Player
                         
             LinkedList<Node> bestPath = null;
             LinkedList<Node> path = null;
+            LinkedList<LinkedList<Node>> paths = new LinkedList<LinkedList<Node>>();
             
             for(Integer exit: skynet.getExits())
             {
 				path = getCurrentPath(si, (int) exit);
-				
+				if(path != null)
+				{
+					paths.add(path);
+				}
 				
 				if(path == null)
 				{
@@ -92,6 +96,36 @@ class Player
 				else if(path.size() < bestPath.size())
 				{
 					bestPath = path;
+				}
+			}
+			
+			/*
+			 * if the link to the gateway does not need to be cut immediately
+			 * in other words, if the bestPath has more than two nodes in it
+			 * [the gateway node and the node leading to the gateway node]
+			 * then take the opportunity to search for nodes that have two links
+			 * to gateway nodes (since this is now possible in the 'finale' version
+			 * of the challenge. 
+			 * 
+			 * If there are no such nodes, stick with the bestPath. 
+			 * If these is 1 such node, sever either of its gatewaylinks
+			 * If there are more than 1 such nodes, pick the one that is closest and
+			 * sever either of its gateway links
+			 * 
+			 */
+			 
+			if(bestPath.size() > 2)
+			{
+				System.err.println("I have time to search for multiple gateway nodes");
+				LinkedList<Node> newPath = lookForMultiGatewayNodes(paths);
+				if(newPath != null)
+				{
+					System.err.println("I have found a multiple gateway node at " + newPath.get(0));
+					bestPath = newPath;
+				}
+				else
+				{
+					System.err.println("There are no multiple gateway nodes remaining");
 				}
 			}
 			
@@ -119,6 +153,64 @@ class Player
 			
 		}
 	}
+	
+	private LinkedList<Node> lookForMultiGatewayNodes(LinkedList<LinkedList<Node>> paths)
+	{
+		LinkedList<Node> bestPath = null;
+		
+		//(bubble)sort paths by length, so the shortest are at the front of the list
+		boolean notSorted = true;
+		while(notSorted)
+		{
+			//assume we won't find a pair to swap
+			notSorted = false;
+			
+			//search the list for adjacent items that are out of order
+			for(int i = 1; i < paths.size(); i++)
+			{
+				if(paths.get(i).size() < paths.get(i-1).size())
+				{
+					//swap them
+					LinkedList<Node> swapMe = paths.get(i);
+					paths.remove(i);
+					paths.add(i-1, swapMe);
+					
+					//the array isn't sorted after all
+					notSorted = true;
+				}
+			}
+		}
+		//end bubblesort, paths is now sorted by length of path					
+			
+		LinkedList<Node> penultimateNodes = new LinkedList<Node>();
+		Node multiGatewayNodeCandidate = null;
+		//loop until a node is found to be the penultimate node in an exit path TWICE
+		
+		//The trouble is, it will not see the node if it is not on the BEST path, even if it has two gateway links
+		//since the paths list only hold best paths. One solution may be to set a property of a node as a multiple exit node. 
+		//Something like if skynet.getExits().getSource()  - but a link will only have one source !*!*!
+		
+		boolean noDuplicates = true;
+		while(noDuplicates)
+		{
+			for(LinkedList<Node> p: paths)
+			{
+				multiGatewayNodeCandidate = p.get(p.size()-2);
+				if(penultimateNodes.contains(multiGatewayNodeCandidate))
+				{
+					bestPath = new LinkedList<Node>();
+					bestPath.add(multiGatewayNodeCandidate); //the penultimate (multigateway) node
+					bestPath.add(p.get(p.size()-1)); //the exit node
+					noDuplicates = false;
+					break;
+				}
+				penultimateNodes.add(multiGatewayNodeCandidate);
+			}
+		}
+		return bestPath;
+				
+	}
+		
 	
 	private boolean linkToSever(Link l, LinkedList<Node> bestPath)
 	{
