@@ -9,6 +9,7 @@ class Player
 	private static final int LINK_COST = 1;
 	Network skynet;
 	Scanner in = new Scanner(System.in);
+	List<Node> multiExitNodes = new ArrayList<Node>();
 	
 	public static void main(String[] args)
 	{
@@ -62,6 +63,28 @@ class Player
         
         skynet = new Network(nodes, links, exits);
         
+		
+		//establish a list of nodes that have more than 1 link to an exit
+		List<Node> penultimateExitNodes = new ArrayList<Node>();		
+		
+        for(Link l: skynet.getLinks())
+        {
+			//if the list of exit indexes contains the index of this links destination node, then this link goes to an exit
+			if(exits.contains(Integer.parseInt(l.getDestination().getId())))
+			{
+				if(penultimateExitNodes.contains(l.getSource()))
+				{
+					multiExitNodes.add(l.getSource());
+				}
+				penultimateExitNodes.add(l.getSource());
+			}
+		}
+		penultimateExitNodes = null;     
+		System.err.println("Multi-exit nodes are ");
+		for(Node n: multiExitNodes)
+		{
+			System.err.println("[" + n + "]");
+		}
         
 	}
 	
@@ -117,15 +140,43 @@ class Player
 			if(bestPath.size() > 2)
 			{
 				System.err.println("I have time to search for multiple gateway nodes");
-				LinkedList<Node> newPath = lookForMultiGatewayNodes(paths);
-				if(newPath != null)
+				
+				if(multiExitNodes != null && multiExitNodes.size() > 0)
 				{
-					System.err.println("I have found a multiple gateway node at " + newPath.get(0));
-					bestPath = newPath;
+					System.err.println("There are " + multiExitNodes.size() + " multiple gateway nodes");
+					System.err.println("Establishing shortest path to each");
+					int bestLength = Integer.MAX_VALUE;
+					for(Node n: multiExitNodes)
+					{
+						path = getCurrentPath(si, Integer.parseInt(n.getId()));
+						if(path.size() < bestLength)
+						{
+							bestPath = path;
+							bestLength = path.size();
+						}
+					}
+					//best path currently ends in the multiExit node. We need this node and a linked exit node. 
+					//so search the links list to find a link that has an exit at one end and this node at the other
+					for(Link l: skynet.getLinks())
+					{
+						Node destination = l.getDestination();
+						Node source = l.getSource();
+						Node penultimate = bestPath.get(bestLength-1);
+						
+						if(skynet.getExits().contains(Integer.parseInt(destination.getId())) && source.equals(penultimate))
+						{
+							bestPath.add(destination);
+							multiExitNodes.remove(penultimate);
+							System.err.println("Removed " + penultimate + " from list of multi exit nodes");
+							System.err.println("This list now contains " + multiExitNodes.size() + " nodes");
+							break;
+						}						
+					}										
+							
 				}
 				else
 				{
-					System.err.println("There are no multiple gateway nodes remaining");
+					System.err.println("There are no multiple gateway nodes");
 				}
 			}
 			
@@ -152,64 +203,7 @@ class Player
             System.out.println(actionString); // Example: 0 1 are the indices of the nodes you wish to sever the link between
 			
 		}
-	}
-	
-	private LinkedList<Node> lookForMultiGatewayNodes(LinkedList<LinkedList<Node>> paths)
-	{
-		LinkedList<Node> bestPath = null;
-		
-		//(bubble)sort paths by length, so the shortest are at the front of the list
-		boolean notSorted = true;
-		while(notSorted)
-		{
-			//assume we won't find a pair to swap
-			notSorted = false;
-			
-			//search the list for adjacent items that are out of order
-			for(int i = 1; i < paths.size(); i++)
-			{
-				if(paths.get(i).size() < paths.get(i-1).size())
-				{
-					//swap them
-					LinkedList<Node> swapMe = paths.get(i);
-					paths.remove(i);
-					paths.add(i-1, swapMe);
-					
-					//the array isn't sorted after all
-					notSorted = true;
-				}
-			}
-		}
-		//end bubblesort, paths is now sorted by length of path					
-			
-		LinkedList<Node> penultimateNodes = new LinkedList<Node>();
-		Node multiGatewayNodeCandidate = null;
-		//loop until a node is found to be the penultimate node in an exit path TWICE
-		
-		//The trouble is, it will not see the node if it is not on the BEST path, even if it has two gateway links
-		//since the paths list only hold best paths. One solution may be to set a property of a node as a multiple exit node. 
-		//Something like if skynet.getExits().getSource()  - but a link will only have one source !*!*!
-		
-		boolean noDuplicates = true;
-		while(noDuplicates)
-		{
-			for(LinkedList<Node> p: paths)
-			{
-				multiGatewayNodeCandidate = p.get(p.size()-2);
-				if(penultimateNodes.contains(multiGatewayNodeCandidate))
-				{
-					bestPath = new LinkedList<Node>();
-					bestPath.add(multiGatewayNodeCandidate); //the penultimate (multigateway) node
-					bestPath.add(p.get(p.size()-1)); //the exit node
-					noDuplicates = false;
-					break;
-				}
-				penultimateNodes.add(multiGatewayNodeCandidate);
-			}
-		}
-		return bestPath;
-				
-	}
+	}	
 		
 	
 	private boolean linkToSever(Link l, LinkedList<Node> bestPath)
@@ -240,8 +234,8 @@ class Player
 		//assertTrue(path.size() > 0);
     
 		System.err.println("The agent is at Node " + si);
-		System.err.println("There is an exit at Node " + exit);
-		System.err.println("The path between agent and exit is ");
+		System.err.println("There is an exit (or multi-exit node) at Node " + exit);
+		System.err.println("The path between agent and exit (or multi-exit node) is ");
 		
 		if(path == null)
 		{
