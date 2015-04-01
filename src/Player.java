@@ -145,23 +145,57 @@ class Player
 				{
 					System.err.println("There are " + multiExitNodes.size() + " multiple gateway nodes");
 					System.err.println("Establishing shortest path to each");
-					int bestLength = Integer.MAX_VALUE;
+					int lowestSpareMoves = Integer.MAX_VALUE;
+					Node criticalNode = null;
 					for(Node n: multiExitNodes)
 					{
 						path = getCurrentPath(si, Integer.parseInt(n.getId()));
-						if(path.size() < bestLength)
+						
+						//this needs changing to count "spare moves" rather than path length. 
+						//see if each node in the path to the multiExit node is the source of
+						//an exit link and if it isn't there is a 'spare move'.
+						System.err.println("Finding the critical node");
+						int spareMoves = 0;
+						for(Node m: path)
+						{						
+							boolean hasSpareMove = true;
+							for(Link l: skynet.getLinks())
+							{
+								//find an exit link
+								if(skynet.getExits().contains(Integer.parseInt(l.getDestination().getId())))
+								{
+									//that has this node as it's source
+									if(l.getSource().equals(m))
+									{
+										//break because there is no spare move
+										hasSpareMove = false;
+										break;
+									}									
+								}
+							}
+							if(hasSpareMove)
+							{
+								spareMoves++;
+							}
+						}
+						System.err.println("Node " + n + " has " + spareMoves + " spare moves.");
+						if(spareMoves < lowestSpareMoves)
 						{
-							bestPath = path;
-							bestLength = path.size();
+							criticalNode = n;
+							lowestSpareMoves = spareMoves;							
 						}
 					}
-					//best path currently ends in the multiExit node. We need this node and a linked exit node. 
+					bestPath = getCurrentPath(si, Integer.parseInt(criticalNode.getId()));						
+					
+					//We now have the critical node to sever and the path to it. We need this node and a linked exit node. 
 					//so search the links list to find a link that has an exit at one end and this node at the other
+					
+					
 					for(Link l: skynet.getLinks())
 					{
 						Node destination = l.getDestination();
 						Node source = l.getSource();
-						Node penultimate = bestPath.get(bestLength-1);
+						Node penultimate = criticalNode;
 						
 						if(skynet.getExits().contains(Integer.parseInt(destination.getId())) && source.equals(penultimate))
 						{
